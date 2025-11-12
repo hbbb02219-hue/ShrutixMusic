@@ -16,27 +16,38 @@ import random
 import logging
 import aiohttp
 from os import getenv
-import base64
 
-def _l():
+API_URL = None
+VIDEO_API_URL = None
+API_KEY = None
+
+async def load_api_config():
+    global API_URL, VIDEO_API_URL, API_KEY
     try:
-        _u = base64.b64decode(b'aHR0cHM6Ly9iYXRiaW4ubWUvcmF3L21lc25l').decode()
-        _r = requests.get(_u, timeout=10)
-        if _r.status_code == 200:
-            _c = {}
-            for line in _r.text.strip().split('\n'):
-                if '=' in line:
-                    k, v = line.split('=', 1)
-                    _c[k.strip()] = v.strip()
-            return _c
-        return {}
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://batbin.me/raw/mesne") as response:
+                if response.status == 200:
+                    content = await response.text()
+                    for line in content.strip().split('\n'):
+                        if '=' in line:
+                            k, v = line.split('=', 1)
+                            if k.strip() == 'API_URL':
+                                API_URL = v.strip()
+                            elif k.strip() == 'VIDEO_API_URL':
+                                VIDEO_API_URL = v.strip()
+                            elif k.strip() == 'API_KEY':
+                                API_KEY = v.strip()
     except:
-        return {}
+        pass
 
-_cfg = _l()
-API_URL = _cfg.get('API_URL', '')
-VIDEO_API_URL = _cfg.get('VIDEO_API_URL', '')
-API_KEY = _cfg.get('API_KEY', '')
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        asyncio.create_task(load_api_config())
+    else:
+        loop.run_until_complete(load_api_config())
+except RuntimeError:
+    pass
 
 
 def cookie_txt_file():
@@ -51,6 +62,11 @@ def cookie_txt_file():
 
 
 async def download_song(link: str):
+    global API_URL, API_KEY
+    
+    if not API_URL:
+        await load_api_config()
+    
     video_id = link.split('v=')[-1].split('&')[0]
 
     download_folder = "downloads"
@@ -113,6 +129,11 @@ async def download_song(link: str):
     return None
 
 async def download_video(link: str):
+    global VIDEO_API_URL, API_KEY
+    
+    if not VIDEO_API_URL:
+        await load_api_config()
+    
     video_id = link.split('v=')[-1].split('&')[0]
 
     download_folder = "downloads"
